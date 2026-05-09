@@ -1,2 +1,112 @@
-# bct-llm-agent
-LLM-powered user modeling and recommendation agent built for the DSN x BCT Hackathon 3.0. Generates simulated Amazon reviews and personalized recommendations using Groq (Llama 3.3) with Nigerian cultural context.
+# DSN x BCT LLM Agent Challenge — Hackathon 3.0
+
+> Designing agents that understand how people behave, what they want, and what they'll choose next.
+
+## Overview
+An LLM-powered agent system built for the DSN x Bluechip Technologies Hackathon 3.0.
+This project tackles both tasks using real Amazon Reviews data, Groq (Llama 3.3-70b), 
+and FastAPI — with Nigerian cultural context baked in.
+
+## Tasks
+### Task A — User Modeling (Review Generator)
+Given a user's review history and a new product, the agent simulates what that user 
+would write as a review — matching their tone, rating style, and adding natural 
+Nigerian expressions.
+
+### Task B — Recommendation
+Given a user's review history, the agent recommends 3 products they would love — 
+reasoning like a smart Nigerian friend who knows their taste.
+
+## Tech Stack
+- **LLM:** Groq (llama-3.3-70b-versatile) — fast, free, powerful
+- **Framework:** FastAPI
+- **Dataset:** Amazon Reviews 2023 (Gift Cards category)
+- **Language:** Python 3.11
+
+## How To Run
+
+### 1. Clone the repo
+```bash
+git clone https://github.com/Oluwatobi-abu/bct-llm-agent.git
+cd bct-llm-agent
+```
+
+### 2. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Set up environment variables
+Create a `.env` file in the root folder:
+
+### 4. Download the dataset
+```bash
+python download_data.py
+```
+
+### 5. Run the API
+```bash
+uvicorn main:app --reload
+```
+
+### 6. Test the endpoints
+Visit: `http://127.0.0.1:8000/docs`
+
+## API Endpoints
+
+### POST `/generate-review`
+Simulates a user review for a new product.
+
+**Input:**
+```json
+{
+  "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA",
+  "product_name": "Amazon eGift Card - Birthday Cake",
+  "product_description": "A digital gift card delivered by email, perfect for birthdays."
+}
+```
+
+**Output:**
+```json
+{
+  "rating": 5.0,
+  "title": "Perfect birthday gift, no worries",
+  "text": "Having Amazon money is always a good thing...",
+  "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA",
+  "product_name": "Amazon eGift Card - Birthday Cake"
+}
+```
+
+### POST `/recommend`
+Recommends 3 products based on user history.
+
+**Input:**
+```json
+{
+  "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA",
+  "category": "Gift Cards"
+}
+```
+
+**Output:**
+```json
+{
+  "recommendations": [
+    {
+      "product_name": "Amazon Gift Card",
+      "reason": "My guy, you know what's always good..."
+    }
+  ],
+  "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA"
+}
+```
+
+## Docker
+```bash
+docker build -t bct-llm-agent .
+docker run -p 8000:8000 --env-file .env bct-llm-agent
+```
+
+## Author
+Abubakar Oluwatobi — Data Science Nigeria (DSN) Student
+GitHub: [Oluwatobi-abu](https://github.com/Oluwatobi-abu)

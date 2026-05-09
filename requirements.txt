@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+groq
+pandas
+python-dotenv
+requests
+datasets
+rouge-score
