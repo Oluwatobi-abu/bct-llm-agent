@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import json
 import os
+import requests
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -11,7 +12,37 @@ app = FastAPI(title="BCT Hackathon - LLM Review & Recommendation Agent")
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
+# ── Auto-download data on startup ─────────────────────────────
+def ensure_data_exists():
+    if not os.path.exists("data/gift_cards_reviews.jsonl"):
+        os.makedirs("data", exist_ok=True)
+        print("Downloading dataset...")
+        url = "https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023/resolve/main/raw/review_categories/Gift_Cards.jsonl"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, stream=True)
+        if response.status_code == 200:
+            with open("data/gift_cards_reviews.jsonl", "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            print("Dataset downloaded!")
+        else:
+            print("Using backup sample data...")
+            sample_reviews = [
+                {"user_id": "U001", "asin": "B001E4KFG0", "rating": 5.0, "text": "Great gift card, easy to use and recipient loved it!", "title": "Perfect gift"},
+                {"user_id": "U001", "asin": "B002L3XLBO", "rating": 4.0, "text": "Good value, delivered instantly to email.", "title": "Good product"},
+                {"user_id": "U002", "asin": "B001E4KFG0", "rating": 3.0, "text": "Okay gift card but took long to arrive.", "title": "Average"},
+                {"user_id": "U002", "asin": "B003AVKOP2", "rating": 5.0, "text": "Excellent! Bought for my friend and she was happy.", "title": "Loved it"},
+                {"user_id": "U003", "asin": "B002L3XLBO", "rating": 2.0, "text": "Did not work at first, had to call support.", "title": "Frustrating"},
+                {"user_id": "U003", "asin": "B003AVKOP2", "rating": 4.0, "text": "Nice gift option, will buy again.", "title": "Good"},
+            ]
+            with open("data/gift_cards_reviews.jsonl", "w") as f:
+                for review in sample_reviews:
+                    f.write(json.dumps(review) + "\n")
+
+# Run on startup
+ensure_data_exists()
 # ── Input shapes ──────────────────────────────────────────────
+
 class ReviewRequest(BaseModel):
     user_id: str
     product_name: str
