@@ -37,6 +37,7 @@ reasoning like a smart Nigerian friend who knows their taste. 😄
 | ⚡ FastAPI | API framework |
 | 🐍 Python 3.11 | Core language |
 | 📦 Amazon Reviews 2023 | Dataset |
+| 💬 Multi-turn Chat | Conversational memory across requests |
 | 🐳 Docker | Containerization |
 
 ---
@@ -123,6 +124,43 @@ Recommends 3 products based on user history.
     }
   ],
   "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA"
+}
+```
+### 💬 POST `/recommend/chat`
+Multi-turn conversational recommendations with memory.
+
+**Input (First message):**
+```json
+{
+  "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA",
+  "message": "Recommend some gift cards for me",
+  "category": "Gift Cards",
+  "history": []
+}
+```
+
+**Input (Follow-up message):**
+```json
+{
+  "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA",
+  "message": "Show me cheaper options abeg",
+  "category": "Gift Cards",
+  "history": [
+    {"role": "user", "content": "Recommend some gift cards for me"},
+    {"role": "assistant", "content": "<previous response>"}
+  ]
+}
+```
+
+**Output:**
+```json
+{
+  "message": "No worries my friend, make you no go break the bank!",
+  "recommendations": [...],
+  "follow_up": "How much are you looking to spend?",
+  "ndcg_score": 0.9528,
+  "cold_start": false,
+  "history": [...]
 }
 ```
 
