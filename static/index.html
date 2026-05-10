@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NaijAI — Smart Review & Recommendation Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00c853;
+    --dark-green: #007a32;
+    --white: #00c853;
+    --black: #0a0a0a;
+    --card-bg: #111411;
+    --border: rgba(0,200,83,0.2);
+    --text: #e8f5e9;
+    --muted: #6a9f72;
+    --error: #ff5252;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--black);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,200,83,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,83,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glow orbs */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .orb-1 {
+    width: 400px; height: 400px;
+    background: rgba(0,200,83,0.08);
+    top: -100px; left: -100px;
+  }
+  .orb-2 {
+    width: 300px; height: 300px;
+    background: rgba(0,122,50,0.06);
+    bottom: 100px; right: -50px;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    padding: 48px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+
+  .flag-strip {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+  }
+  .flag-strip span {
+    height: 4px;
+    border-radius: 2px;
+    flex: 1;
+  }
+  .flag-strip .g { background: #00c853; }
+  .flag-strip .w { background: #ffffff; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,200,83,0.1);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--green);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(36px, 6vw, 64px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 16px;
+  }
+
+  h1 .accent { color: var(--green); }
+
+  .subtitle {
+    font-size: 16px;
+    color: var(--muted);
+    font-weight: 300;
+    max-width: 500px;
+    line-height: 1.6;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 32px;
+    width: fit-content;
+  }
+
+  .tab {
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .tab.active {
+    background: var(--green);
+    color: var(--black);
+  }
+
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Card */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 24px;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Form */
+  .field { margin-bottom: 20px; }
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  input, textarea, select {
+    width: 100%;
+    background: rgba(0,200,83,0.04);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    resize: none;
+  }
+
+  input:focus, textarea:focus {
+    border-color: var(--green);
+    background: rgba(0,200,83,0.07);
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: rgba(106,159,114,0.5);
+    font-style: italic;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 14px 24px;
+    background: var(--green);
+    color: var(--black);
+    border: none;
+    border-radius: 10px;
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .btn:hover { background: #00e55f; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn .spinner {
+    display: none;
+    width: 18px; height: 18px;
+    border: 2px solid rgba(0,0,0,0.3);
+    border-top-color: var(--black);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .btn.loading .btn-text { display: none; }
+  .btn.loading .spinner { display: block; }
+
+  /* Result */
+  .result {
+    display: none;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .result.show { display: block; }
+
+  .stars {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .star {
+    font-size: 20px;
+    color: #ffd600;
+    animation: starPop 0.3s ease both;
+  }
+
+  @keyframes starPop {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .review-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--text);
+  }
+
+  .review-text {
+    font-size: 15px;
+    line-height: 1.7;
+    color: #b2dfbb;
+    font-style: italic;
+    border-left: 3px solid var(--green);
+    padding-left: 16px;
+  }
+
+  .reco-card {
+    background: rgba(0,200,83,0.05);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 12px;
+    animation: fadeUp 0.4s ease both;
+    transition: border-color 0.2s;
+  }
+
+  .reco-card:hover { border-color: var(--green); }
+
+  .reco-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--green);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .reco-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .reco-reason {
+    font-size: 14px;
+    color: #b2dfbb;
+    line-height: 1.6;
+  }
+
+  .error-msg {
+    background: rgba(255,82,82,0.1);
+    border: 1px solid rgba(255,82,82,0.3);
+    border-radius: 10px;
+    padding: 16px;
+    color: var(--error);
+    font-size: 14px;
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 48px 0 32px;
+    color: var(--muted);
+    font-size: 13px;
+    border-top: 1px solid var(--border);
+    margin-top: 48px;
+  }
+
+  footer strong { color: var(--green); }
+
+  .meta-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .meta-chip {
+    background: rgba(0,200,83,0.08);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<div class="container">
+  <header>
+    <div class="flag-strip">
+      <span class="g"></span><span class="w"></span><span class="g"></span>
+    </div>
+    <div class="badge">🇳🇬 DSN × BCT Hackathon 3.0 — Live Agent</div>
+    <h1>Naij<span class="accent">AI</span><br>Review Agent</h1>
+    <p class="subtitle">An LLM-powered agent that understands how Nigerians shop, rate, and recommend. Powered by Llama 3.3-70b via Groq.</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('review', this)">📝 Generate Review</button>
+    <button class="tab" onclick="switchTab('recommend', this)">🎯 Get Recommendations</button>
+  </div>
+
+  <!-- TASK A: Review Panel -->
+  <div class="panel active" id="panel-review">
+    <div class="card">
+      <div class="card-title">Task A — User Modeling</div>
+
+      <div class="meta-row">
+        <span class="meta-chip">Amazon Reviews 2023</span>
+        <span class="meta-chip">Llama 3.3-70b</span>
+        <span class="meta-chip">Nigerian Context 🇳🇬</span>
+      </div>
+
+      <div class="field">
+        <label>User ID</label>
+        <input type="text" id="r-userid" placeholder="e.g. AHZ6XMOLEWA67S3TX7IWEXXGWSOA" value="AHZ6XMOLEWA67S3TX7IWEXXGWSOA"/>
+      </div>
+      <div class="field">
+        <label>Product Name</label>
+        <input type="text" id="r-product" placeholder="e.g. Amazon eGift Card - Birthday Cake" value="Amazon eGift Card - Birthday Cake"/>
+      </div>
+      <div class="field">
+        <label>Product Description</label>
+        <textarea id="r-desc" rows="3" placeholder="Describe the product...">A digital Amazon gift card delivered by email, perfect for birthdays. Available in any amount.</textarea>
+      </div>
+
+      <button class="btn" id="btn-review" onclick="generateReview()">
+        <span class="btn-text">Generate Review ✨</span>
+        <div class="spinner"></div>
+      </button>
+    </div>
+
+    <div class="result card" id="result-review">
+      <div class="card-title">AI Generated Review</div>
+      <div class="stars" id="stars-display"></div>
+      <div class="review-title" id="review-title"></div>
+      <div class="review-text" id="review-text"></div>
+    </div>
+
+    <div class="result" id="error-review">
+      <div class="error-msg" id="error-review-msg"></div>
+    </div>
+  </div>
+
+  <!-- TASK B: Recommend Panel -->
+  <div class="panel" id="panel-recommend">
+    <div class="card">
+      <div class="card-title">Task B — Smart Recommendation</div>
+
+      <div class="meta-row">
+        <span class="meta-chip">Contextual Reasoning</span>
+        <span class="meta-chip">Nigerian Friend Mode 😄</span>
+      </div>
+
+      <div class="field">
+        <label>User ID</label>
+        <input type="text" id="rc-userid" placeholder="e.g. AHZ6XMOLEWA67S3TX7IWEXXGWSOA" value="AHZ6XMOLEWA67S3TX7IWEXXGWSOA"/>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <input type="text" id="rc-category" placeholder="e.g. Gift Cards, Electronics, Books" value="Gift Cards"/>
+      </div>
+
+      <button class="btn" id="btn-recommend" onclick="getRecommendations()">
+        <span class="btn-text">Get Recommendations 🎯</span>
+        <div class="spinner"></div>
+      </button>
+    </div>
+
+    <div class="result" id="result-recommend"></div>
+
+    <div class="result" id="error-recommend">
+      <div class="error-msg" id="error-recommend-msg"></div>
+    </div>
+  </div>
+
+  <footer>
+    Built with 🤖 + 🇳🇬 by <strong>Abubakar Oluwatobi</strong> &nbsp;·&nbsp;
+    DSN × BCT Hackathon 3.0 &nbsp;·&nbsp;
+    <a href="https://github.com/Oluwatobi-abu/bct-llm-agent" style="color:var(--green)">GitHub ↗</a>
+  </footer>
+</div>
+
+<script>
+  const API = 'https://bct-llm-agent.onrender.com';
+
+  function switchTab(tab, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('panel-' + tab).classList.add('active');
+  }
+
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    btn.classList.toggle('loading', loading);
+    btn.disabled = loading;
+  }
+
+  function renderStars(rating) {
+    const full = Math.round(rating);
+    return Array.from({length: 5}, (_, i) => {
+      const star = document.createElement('span');
+      star.className = 'star';
+      star.style.animationDelay = (i * 0.08) + 's';
+      star.textContent = i < full ? '★' : '☆';
+      if (i >= full) star.style.color = '#333';
+      return star;
+    });
+  }
+
+  async function generateReview() {
+    const userId = document.getElementById('r-userid').value.trim();
+    const productName = document.getElementById('r-product').value.trim();
+    const productDescription = document.getElementById('r-desc').value.trim();
+
+    if (!userId || !productName || !productDescription) {
+      alert('Please fill in all fields!'); return;
+    }
+
+    setLoading('btn-review', true);
+    document.getElementById('result-review').classList.remove('show');
+    document.getElementById('error-review').classList.remove('show');
+
+    try {
+      const res = await fetch(API + '/generate-review', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({user_id: userId, product_name: productName, product_description: productDescription})
+      });
+
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+
+      const starsEl = document.getElementById('stars-display');
+      starsEl.innerHTML = '';
+      renderStars(data.rating).forEach(s => starsEl.appendChild(s));
+
+      document.getElementById('review-title').textContent = data.title;
+      document.getElementById('review-text').textContent = data.text;
+      document.getElementById('result-review').classList.add('show');
+
+    } catch (err) {
+      document.getElementById('error-review-msg').textContent = '⚠️ ' + err.message;
+      document.getElementById('error-review').classList.add('show');
+    } finally {
+      setLoading('btn-review', false);
+    }
+  }
+
+  async function getRecommendations() {
+    const userId = document.getElementById('rc-userid').value.trim();
+    const category = document.getElementById('rc-category').value.trim();
+
+    if (!userId || !category) { alert('Please fill in all fields!'); return; }
+
+    setLoading('btn-recommend', true);
+    document.getElementById('result-recommend').innerHTML = '';
+    document.getElementById('result-recommend').classList.remove('show');
+    document.getElementById('error-recommend').classList.remove('show');
+
+    try {
+      const res = await fetch(API + '/recommend', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({user_id: userId, category: category})
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      const container = document.getElementById('result-recommend');
+      container.innerHTML = '';
+
+      data.recommendations.forEach((rec, i) => {
+        const card = document.createElement('div');
+        card.className = 'reco-card';
+        card.style.animationDelay = (i * 0.1) + 's';
+        card.innerHTML = `
+          <div class="reco-num">Pick #${i + 1}</div>
+          <div class="reco-name">${rec.product_name}</div>
+          <div class="reco-reason">${rec.reason}</div>
+        `;
+        container.appendChild(card);
+      });
+
+      container.classList.add('show');
+
+    } catch (err) {
+      document.getElementById('error-recommend-msg').textContent = '⚠️ ' + err.message;
+      document.getElementById('error-recommend').classList.add('show');
+    } finally {
+      setLoading('btn-recommend', false);
+    }
+  }
+</script>
+</body>
+</html>
