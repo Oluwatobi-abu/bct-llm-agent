@@ -166,12 +166,28 @@ Multi-turn conversational recommendations with memory.
 
 ---
 
-## 🐳 Docker
+## 🐳 Docker & Deployment
 
+The project is fully containerized with Docker. The `Dockerfile` is included
+in the repository and is used automatically by Render for cloud deployment.
+
+### Run with Docker locally:
 ```bash
 docker build -t bct-llm-agent .
 docker run -p 8000:8000 --env-file .env bct-llm-agent
 ```
+
+### Cloud Deployment (Render):
+The app is deployed and live at:
+👉 **https://bct-llm-agent.onrender.com**
+
+Render automatically builds the Docker container on every push to `main`.
+No manual deployment needed.
+
+### Environment Variables Required:
+| Variable | Description |
+|---|---|
+| `GROQ_API_KEY` | Your Groq API key from console.groq.com |
 
 ---
 
