@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import json
 import os
 import requests
@@ -10,6 +12,12 @@ load_dotenv()
 
 app = FastAPI(title="BCT Hackathon - LLM Review & Recommendation Agent")
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/ui")
+def ui():
+    return FileResponse("static/index.html")
 
 
 # ── Auto-download data on startup ─────────────────────────────
