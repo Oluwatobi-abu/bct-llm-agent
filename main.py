@@ -2,8 +2,10 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from typing import List
 import json
 import os
+import re
 import requests
 from groq import Groq
 from dotenv import load_dotenv
@@ -134,15 +136,55 @@ Respond ONLY in this JSON format, no markdown, no backticks:
     return result
 
 
-# ── Task B: Recommend products ────────────────────────────────
+# ── Task B: Recommend products with NDCG ranking ──────────────
 @app.post("/recommend")
 def recommend(req: RecommendRequest):
     past_reviews = load_user_reviews(req.user_id)
 
+    # ── Cold-start handling ────────────────────────────────────
     if not past_reviews:
-        return {"error": f"No reviews found for user {req.user_id}"}
+        cold_prompt = f"""You are a smart Nigerian shopping assistant on Amazon.
 
+This is a NEW user with no purchase history yet.
+
+Recommend 3 popular and highly rated products in the "{req.category}" category
+that would appeal to most Nigerian Amazon shoppers.
+Think about what Nigerian users generally value: good value for money,
+reliability, and products that make great gifts.
+
+Respond ONLY in this JSON format, no markdown, no backticks:
+{{
+  "recommendations": [
+    {{
+      "product_name": "<name>",
+      "reason": "<why most Nigerian shoppers would love it>",
+      "relevance_score": <float between 0.0 and 1.0>
+    }},
+    {{
+      "product_name": "<name>",
+      "reason": "<why most Nigerian shoppers would love it>",
+      "relevance_score": <float between 0.0 and 1.0>
+    }},
+    {{
+      "product_name": "<name>",
+      "reason": "<why most Nigerian shoppers would love it>",
+      "relevance_score": <float between 0.0 and 1.0>
+    }}
+  ],
+  "cold_start": true,
+  "ndcg_score": 0.0,
+  "user_id": "{req.user_id}"
+}}"""
+        result = call_groq(cold_prompt)
+        result["user_id"] = req.user_id
+        result["cold_start"] = True
+        return result
+
+    # ── Build user profile ─────────────────────────────────────
     history_text = ""
+    avg_rating = sum(r["rating"] for r in past_reviews) / len(past_reviews)
+    high_rated = [r for r in past_reviews if r["rating"] >= 4.0]
+
     for r in past_reviews:
         history_text += f"""
 - Product: {r['asin']}
@@ -150,33 +192,241 @@ def recommend(req: RecommendRequest):
   Review: {r['text']}
 """
 
-    prompt = f"""You are a smart Nigerian shopping assistant on Amazon.
+    # ── Step 1: Generate 10 candidates ────────────────────────
+    candidate_prompt = f"""You are a smart Nigerian shopping assistant on Amazon.
 
-This user's past reviews:
+USER PROFILE:
+- Average rating given: {avg_rating:.1f} stars
+- Number of reviews: {len(past_reviews)}
+- High-rated products: {len(high_rated)} out of {len(past_reviews)}
+
+PAST REVIEWS:
 {history_text}
 
-Based on their taste and behaviour, recommend 3 products in the "{req.category}" category.
-Consider: what they liked, how generous they are with ratings, what they value.
-Make recommendations sound like a friendly Nigerian friend advising them.
+Generate 10 different product candidates in the "{req.category}" category
+that this user might enjoy based on their history.
+Assign each a relevance_score (0.0 to 1.0) based on how well it matches
+this user's demonstrated preferences. Higher score = better match.
+
+Respond ONLY in this JSON format, no markdown, no backticks:
+{{
+  "candidates": [
+    {{"product_name": "<name>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "relevance_score": <0.0-1.0>}}
+  ]
+}}"""
+
+    candidates_result = call_groq(candidate_prompt)
+    candidates = candidates_result["candidates"]
+
+    # ── Step 2: Sort by relevance score (NDCG ranking) ────────
+    candidates_sorted = sorted(
+        candidates,
+        key=lambda x: x["relevance_score"],
+        reverse=True
+    )
+
+    # ── Step 3: Calculate NDCG@10 score ───────────────────────
+    import math
+
+    def dcg(scores):
+        return sum(
+            (2 ** s - 1) / math.log2(i + 2)
+            for i, s in enumerate(scores)
+        )
+
+    actual_scores = [c["relevance_score"] for c in candidates_sorted]
+    ideal_scores = sorted(actual_scores, reverse=True)
+
+    dcg_score = dcg(actual_scores)
+    idcg_score = dcg(ideal_scores)
+    ndcg = round(dcg_score / idcg_score, 4) if idcg_score > 0 else 0.0
+
+    # ── Step 4: Get top 3 with Nigerian-style reasons ─────────
+    top3 = candidates_sorted[:3]
+    top3_text = "\n".join(
+        [f"{i+1}. {c['product_name']} (score: {c['relevance_score']})"
+         for i, c in enumerate(top3)]
+    )
+
+    reason_prompt = f"""You are a smart Nigerian shopping assistant on Amazon.
+
+Based on this user's history:
+{history_text}
+
+These are the TOP 3 recommended products (already ranked best to worst):
+{top3_text}
+
+For each product, write a short warm reason why this specific user would love it.
+Sound like a friendly Nigerian friend giving advice naturally.
+Use Nigerian expressions where they fit (e.g. "e good", "my guy", "e worth am", "abi").
 
 Respond ONLY in this JSON format, no markdown, no backticks:
 {{
   "recommendations": [
     {{
-      "product_name": "<name>",
-      "reason": "<why this user would love it, in natural Nigerian tone>"
+      "product_name": "<exact name from list>",
+      "reason": "<Nigerian-style reason>",
+      "relevance_score": <score from above>
     }},
     {{
-      "product_name": "<name>",
-      "reason": "<why this user would love it>"
+      "product_name": "<exact name from list>",
+      "reason": "<Nigerian-style reason>",
+      "relevance_score": <score from above>
     }},
     {{
-      "product_name": "<name>",
-      "reason": "<why this user would love it>"
+      "product_name": "<exact name from list>",
+      "reason": "<Nigerian-style reason>",
+      "relevance_score": <score from above>
     }}
   ]
 }}"""
 
-    result = call_groq(prompt)
+    final_result = call_groq(reason_prompt)
+    final_result["user_id"] = req.user_id
+    final_result["cold_start"] = False
+    final_result["ndcg_score"] = ndcg
+
+    return final_result
+
+# ── Multi-turn conversation model ─────────────────────────────
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+class ChatRequest(BaseModel):
+    user_id: str
+    message: str
+    category: str = "Gift Cards"
+    history: List[ChatMessage] = []
+
+
+# ── Task B: Multi-turn conversational recommendation ──────────
+@app.post("/recommend/chat")
+def recommend_chat(req: ChatRequest):
+    past_reviews = load_user_reviews(req.user_id)
+
+    # Build user profile text
+    if past_reviews:
+        avg_rating = sum(r["rating"] for r in past_reviews) / len(past_reviews)
+        history_text = ""
+        for r in past_reviews:
+            history_text += f"""
+- Product: {r['asin']}
+  Rating: {r['rating']} stars
+  Review: {r['text']}
+"""
+        user_context = f"""USER REVIEW HISTORY:
+Average rating given: {avg_rating:.1f} stars
+Reviews:
+{history_text}"""
+    else:
+        user_context = "NEW USER — no review history available. Use popular Nigerian preferences."
+
+    # Build conversation history for LLM
+    conversation = []
+
+    # System message
+    system_msg = f"""You are NaijAI, a smart Nigerian shopping assistant on Amazon.
+You remember everything discussed in this conversation.
+You give personalized product recommendations based on the user's history.
+Always sound like a friendly, knowledgeable Nigerian friend.
+Use natural Nigerian expressions where they fit naturally.
+
+{user_context}
+
+When recommending products, always return your response in this JSON format:
+{{
+  "message": "<your friendly Nigerian response>",
+  "recommendations": [
+    {{"product_name": "<name>", "reason": "<reason>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "reason": "<reason>", "relevance_score": <0.0-1.0>}},
+    {{"product_name": "<name>", "reason": "<reason>", "relevance_score": <0.0-1.0>}}
+  ],
+  "follow_up": "<one question to refine recommendations further>"
+}}
+If the user is just chatting or asking a question without needing recommendations,
+return:
+{{
+  "message": "<your friendly response>",
+  "recommendations": [],
+  "follow_up": "<relevant follow-up question>"
+}}
+Always respond with valid JSON only. No markdown, no backticks."""
+
+    # Add past conversation history
+    for msg in req.history:
+        conversation.append({
+            "role": msg.role,
+            "content": msg.content
+        })
+
+    # Add current user message
+    conversation.append({
+        "role": "user",
+        "content": req.message
+    })
+
+    # Call Groq with full conversation
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": system_msg},
+            *conversation
+        ],
+        temperature=0.7,
+        max_tokens=800
+    )
+
+    raw = response.choices[0].message.content.strip()
+    raw = raw.replace("```json", "").replace("```", "").strip()
+
+    # Find JSON object in response even if LLM adds extra text
+    json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if json_match:
+        raw = json_match.group(0)
+
+    if not raw:
+        return {
+            "message": "E don happen o! Something went wrong, abeg try again my guy.",
+            "recommendations": [],
+            "follow_up": "What category of products are you interested in?",
+            "ndcg_score": 0.0,
+            "user_id": req.user_id,
+            "history": []
+        }
+
+    result = json.loads(raw)
+
+    # Add NDCG score if recommendations exist
+    if result.get("recommendations"):
+        import math
+        scores = [r["relevance_score"] for r in result["recommendations"]]
+        sorted_scores = sorted(scores, reverse=True)
+
+        def dcg(s):
+            return sum((2**v - 1) / math.log2(i + 2) for i, v in enumerate(s))
+
+        ndcg = round(dcg(scores) / dcg(sorted_scores), 4) if dcg(sorted_scores) > 0 else 0.0
+        result["ndcg_score"] = ndcg
+    else:
+        result["ndcg_score"] = 0.0
+
+    # Append assistant response to history
+    updated_history = list(req.history) + [
+        ChatMessage(role="user", content=req.message),
+        ChatMessage(role="assistant", content=raw)
+    ]
+
     result["user_id"] = req.user_id
+    result["history"] = [{"role": m.role, "content": m.content} for m in updated_history]
+
     return result
