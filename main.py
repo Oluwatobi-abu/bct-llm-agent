@@ -89,7 +89,7 @@ def call_groq(prompt):
 # ── Root ──────────────────────────────────────────────────────
 @app.get("/")
 def root():
-    return {"message": "BCT Hackathon Agent is running!"}
+    return FileResponse("static/index.html")
 
 
 # ── Task A: Generate a review ─────────────────────────────────
