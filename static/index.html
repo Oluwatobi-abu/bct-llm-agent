@@ -576,10 +576,15 @@
     document.getElementById('error-recommend').classList.remove('show');
 
     try {
-      const res = await fetch(API + '/recommend', {
+      const res = await fetch(API + '/recommend/chat', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({user_id: userId, category: category})
+        body: JSON.stringify({
+          user_id: userId,
+          category: category,
+          message: "Recommend products for me",
+          history: []
+        })
       });
 
       const data = await res.json();
