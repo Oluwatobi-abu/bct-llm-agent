@@ -115,7 +115,7 @@ Works for **known users** (uses real review history) and **unknown users** (uses
 
 **More real output samples across different products:**
 - 🎶 Samsung Earbuds → *"Make my music sound sweet like jollof rice"*
-- 🎂 Birthday Cake → *"No be small thing, my family enjoyed am"*
+- 🎂 Birthday Cake → *"No be small thing, my family enjoy am"*
 - 🍳 Cooking Pot → *"I use am for my small catering business, e dey serve me well"*
 
 ---
