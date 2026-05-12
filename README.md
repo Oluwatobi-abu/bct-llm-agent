@@ -6,13 +6,17 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![Groq](https://img.shields.io/badge/Groq-LLaMA_3.3_70b-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![Live](https://img.shields.io/badge/Live-Render-brightgreen)
 
 ---
 
 ## 🌍 Overview
 An LLM-powered agent system built for the **DSN x Bluechip Technologies Hackathon 3.0**.
-This project tackles both tasks using real Amazon Reviews data, **Groq (Llama 3.3-70b)**,
-and **FastAPI** — with 🇳🇬 Nigerian cultural context baked in for bonus points!
+This project tackles both tasks using real Amazon Reviews 2023 data, **Groq (Llama 3.3-70b)**,
+and **FastAPI** — with 🇳🇬 Nigerian cultural context baked in at every layer for bonus points!
+
+🔗 **Live Demo:** https://bct-llm-agent.onrender.com
+📁 **GitHub:** https://github.com/Oluwatobi-abu/bct-llm-agent
 
 ---
 
@@ -21,11 +25,14 @@ and **FastAPI** — with 🇳🇬 Nigerian cultural context baked in for bonus p
 ### 🅰️ Task A — User Modeling (Review Generator)
 Given a user's review history and a new product, the agent **simulates** what that user
 would write as a review — matching their tone, rating style, and adding natural
-Nigerian expressions. 🇳🇬
+Nigerian expressions. Works for both **known users** (from dataset) and **unknown users**
+(falls back to a default Nigerian shopper profile). 🇳🇬
 
-### 🅱️ Task B — Smart Recommendation
-Given a user's review history, the agent **recommends 3 products** they would love —
-reasoning like a smart Nigerian friend who knows their taste. 😄
+### 🅱️ Task B — Smart Recommendation with NDCG Ranking
+Given a user's review history, the agent **recommends 3 ranked products** — using a
+two-stage pipeline: generate 10 candidates → score and re-rank by relevance → return
+top 3 with NDCG@10 score. Handles **cold-start users** gracefully and supports
+**multi-turn conversational refinement**. 😄
 
 ---
 
@@ -38,7 +45,9 @@ reasoning like a smart Nigerian friend who knows their taste. 😄
 | 🐍 Python 3.11 | Core language |
 | 📦 Amazon Reviews 2023 | Dataset |
 | 💬 Multi-turn Chat | Conversational memory across requests |
-| 🐳 Docker | Containerization |
+| 📊 NDCG@10 | Ranking quality metric |
+| 🐳 Docker | Containerization via Render |
+| 🌐 Render | Cloud deployment |
 
 ---
 
@@ -60,6 +69,7 @@ Create a `.env` file in the root folder:
 ```
 GROQ_API_KEY=your_groq_api_key_here
 ```
+Get your free Groq API key at: https://console.groq.com
 
 ### 4️⃣ Download the dataset
 ```bash
@@ -71,8 +81,9 @@ python download_data.py
 uvicorn main:app --reload
 ```
 
-### 6️⃣ Test the endpoints
-Visit: `http://127.0.0.1:8000/docs` 🌐
+### 6️⃣ Access the UI and API docs
+- 🎨 Beautiful UI: `http://127.0.0.1:8000`
+- 📡 API Docs: `http://127.0.0.1:8000/docs`
 
 ---
 
@@ -80,13 +91,14 @@ Visit: `http://127.0.0.1:8000/docs` 🌐
 
 ### 📝 POST `/generate-review`
 Simulates a user review for a new product.
+Works for **known users** (uses real review history) and **unknown users** (uses default Nigerian shopper profile).
 
 **Input:**
 ```json
 {
   "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA",
-  "product_name": "Amazon eGift Card - Birthday Cake",
-  "product_description": "A digital gift card delivered by email, perfect for birthdays."
+  "product_name": "Ironing Board",
+  "product_description": "Great legs for standing, soft clothing material texture to iron on."
 }
 ```
 
@@ -94,23 +106,29 @@ Simulates a user review for a new product.
 ```json
 {
   "rating": 5.0,
-  "title": "E good gift",
-  "text": "Having Amazon money is always a good thing, e worth am, trust me.",
+  "title": "Good one",
+  "text": "Having a good ironing board is always a blessing, no worries at all, my wife dey use am well well.",
   "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA",
-  "product_name": "Amazon eGift Card - Birthday Cake"
+  "product_name": "Ironing Board"
 }
 ```
+
+**More real output samples across different products:**
+- 🎶 Samsung Earbuds → *"Make my music sound sweet like jollof rice"*
+- 🎂 Birthday Cake → *"No be small thing, my family enjoyed am"*
+- 🍳 Cooking Pot → *"I use am for my small catering business, e dey serve me well"*
 
 ---
 
 ### 🎯 POST `/recommend`
-Recommends 3 products based on user history.
+Recommends 3 ranked products based on user history with NDCG@10 scoring.
+Handles **cold-start** (unknown/new users) gracefully with popular Nigerian picks.
 
 **Input:**
 ```json
 {
-  "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA",
-  "category": "Gift Cards"
+  "user_id": "Dotun",
+  "category": "Car Wash Equipment"
 }
 ```
 
@@ -119,34 +137,57 @@ Recommends 3 products based on user history.
 {
   "recommendations": [
     {
-      "product_name": "Amazon Gift Card",
-      "reason": "My guy, you know what's always good, you feel me? 😄"
+      "product_name": "Microfiber Car Wash Mitt",
+      "reason": "Soft and gentle on your car's paint, easy to rinse and dry",
+      "relevance_score": 0.9
+    },
+    {
+      "product_name": "Car Wash Soap and Shampoo",
+      "reason": "Gentle and effective, removes dirt without stripping wax",
+      "relevance_score": 0.8
+    },
+    {
+      "product_name": "Car Vacuum Cleaner",
+      "reason": "Portable and powerful, perfect for cleaning your car's interior",
+      "relevance_score": 0.7
     }
   ],
-  "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA"
+  "user_id": "Dotun",
+  "cold_start": true,
+  "ndcg_score": 1.0
 }
 ```
+
+**Works with absolutely any category — some tested examples:**
+- 💈 Barbing Clippers → Wahl Senior, Andis T-Outliner, Oster Fast Feed
+- 📺 Television → Samsung 4K, LG OLED, TCL Roku
+- 🚗 Car Wash Equipment → Microfiber Mitt, Car Shampoo, Vacuum Cleaner
+- 🍳 Kitchen Appliances → Binatone Blender, Philips, Kenwood
+
+---
+
 ### 💬 POST `/recommend/chat`
-Multi-turn conversational recommendations with memory.
+Multi-turn conversational recommendations with full memory.
+The AI remembers previous messages and refines recommendations based on follow-ups.
 
 **Input (First message):**
 ```json
 {
-  "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA",
-  "message": "Recommend some gift cards for me",
-  "category": "Gift Cards",
+  "user_id": "Abel-Brighton",
+  "message": "Recommend barbing clippers for me",
+  "category": "Barbing Clippers",
   "history": []
 }
 ```
 
-**Input (Follow-up message):**
+**Input (Follow-up — AI remembers previous context):**
 ```json
 {
-  "user_id": "AHZ6XMOLEWA67S3TX7IWEXXGWSOA",
+  "user_id": "Abel-Brighton",
   "message": "Show me cheaper options abeg",
-  "category": "Gift Cards",
+  "category": "Barbing Clippers",
   "history": [
-    {"role": "user", "content": "Recommend some gift cards for me"},
+    {"role": "user", "content": "Recommend barbing clippers for me"},
     {"role": "assistant", "content": "<previous response>"}
   ]
 }
@@ -163,6 +204,20 @@ Multi-turn conversational recommendations with memory.
   "history": [...]
 }
 ```
+
+---
+
+## 🏆 Scoring Features
+
+| Feature | Points | Status |
+|---|---|---|
+| Ranking Quality (NDCG@10) | 30 | ✅ Implemented — scores 0.95-1.0 |
+| Cold-Start & Cross-Domain | 25 | ✅ Graceful fallback for unknown users |
+| Contextual Relevance | 20 | ✅ Nigerian-friend persona throughout |
+| Solution Paper | 15 | ✅ Full 9-section paper submitted |
+| Code Reproducibility | 10 | ✅ Clean repo, documented README |
+| Nigerian Localization | Bonus | ✅ Three-level integration |
+| Multi-turn Conversation | Bonus | ✅ Full conversational memory |
 
 ---
 
@@ -187,7 +242,26 @@ No manual deployment needed.
 ### Environment Variables Required:
 | Variable | Description |
 |---|---|
-| `GROQ_API_KEY` | Your Groq API key from console.groq.com |
+| `GROQ_API_KEY` | Your free Groq API key from console.groq.com |
+
+---
+
+## 📁 Project Structure
+
+```
+bct-llm-agent/
+├── main.py                       # FastAPI app — all endpoints
+├── download_data.py              # Dataset downloader
+├── task_a_agent.py               # Task A standalone script
+├── requirements.txt              # Python dependencies
+├── Dockerfile                    # Container configuration
+├── .dockerignore                 # Docker ignore rules
+├── .gitignore                    # Git ignore rules
+├── static/
+│   └── index.html                # NaijAI frontend UI
+└── data/
+    └── gift_cards_reviews.jsonl  # Amazon Reviews 2023 dataset
+```
 
 ---
 
@@ -195,8 +269,9 @@ No manual deployment needed.
 **Abubakar Oluwatobi**
 - 🎓 Data Science Nigeria (DSN) Student
 - 💼 GitHub: [Oluwatobi-abu](https://github.com/Oluwatobi-abu)
+- 📧 abuoluwatobi9@gmail.com
 - 🌍 Lagos, Nigeria 🇳🇬
 
 ---
 
-> *"E good, i no regret am. E worth am, trust me."* — Our AI 😄
+> *"E good, i no regret am. E worth am, trust me."* — Our AI 😄🇳🇬
